@@ -13,6 +13,19 @@ spotify_endpoint_url = "https://api.spotify.com/v1"
 scope = ["user-read-currently-playing", "user-read-playback-state", "user-read-recently-played"]
 error_codes = [401,503]
 
+def error_handler(request):
+    '''Checks for and deals with specific error codes associated with the intial request'''
+    if request.status_code in error_codes:
+        return redirect(url_for('auth'))
+    elif request.status_code==429:
+        return "Rate Limit Reached: Check developer dashboard<br>You may need to generate a new API key."
+    if request.status_code==204:
+        auth_session = create_auth_session_w_token(session['AUTH_TOKEN'])
+        _, track, progress = fallback(auth_session)
+        return home(track, progress, track['album'], 'playlist')
+    else:
+        return True
+
 @app.route('/')
 def auth():
     '''Generates authentication url and redirects to it'''
@@ -32,13 +45,12 @@ def playing():
     Uses fallback() if this is not accessable'''
     auth_session = create_auth_session_w_token(session['AUTH_TOKEN'])
     r = auth_session.get(f"{spotify_endpoint_url}/me/player")
-    if r.status_code==204:
-        response, track, progress = fallback(auth_session)
-    elif r.status_code in error_codes:
-        return redirect(url_for('auth'))
+    error_check = error_handler(r)
+    if error_check!=True:
+        return error_check
     else:
         response = r.json()
-        if "is_playing" in response:
+        if "is_playing" not in response:
             response, track, progress = fallback(auth_session)
         elif response["is_playing"]:
             track = response['item']
@@ -54,10 +66,9 @@ def playlist():
     '''Same as playing() but fetches playlist information to display'''
     auth_session = create_auth_session_w_token(session['AUTH_TOKEN'])
     r = auth_session.get(f"{spotify_endpoint_url}/me/player")
-    if r.status_code==204:
-        response, track, progress = fallback(auth_session)
-    elif r.status_code in error_codes:
-        return redirect(url_for('auth'))
+    error_check = error_handler(r)
+    if error_check!=True:
+        return error_check
     else:
         response = r.json()
         if "is_playing" not in response:
@@ -67,14 +78,12 @@ def playlist():
             session['id'] = track['id']
             progress = [response['progress_ms'],response['item']['duration_ms']]
             session['progress'] = progress
-            try:
+            if 'context' in response:
                 if response['context']['type']=='playlist':
                     _r = auth_session.get(f"{spotify_endpoint_url}/playlists/{response['context']['uri'].split(':')[-1]}")
                     playlist = _r.json()
                     session['p_id'] = playlist['id']
                     return home(track, progress, playlist, 'playing')
-            except:
-                pass
         else:
             response, track, progress = fallback(auth_session)
             if 'p_id' in session:
