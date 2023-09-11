@@ -5,3 +5,5 @@ Exectuting `spotify_client.py` will start the flask server, and navivating to th
 Alternatively, run the provided `server.bat` file.
 
 Authentication details, found on your personal [Spotify for Developers](https://developer.spotify.com/) dashboard, need to be added into the blank `config.json` provided.
+
+See images of the project in action on [My Portfolio](https://tom-newbold.github.io/subpages/python_spotifyAPI.html).
