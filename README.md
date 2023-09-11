@@ -5,7 +5,3 @@ Exectuting `spotify_client.py` will start the flask server, and navivating to th
 Alternatively, run the provided `server.bat` file.
 
 Authentication details, found on your personal [Spotify for Developers](https://developer.spotify.com/) dashboard, need to be added into the blank `config.json` provided.
-
-#### Currently working on:
-
-<i>/playlist_followers/ page</i> - This should be able to show all your playlists, and fetch the usernames of those who follow it (as long as they follow you). Unfortunately, I have run into some problems when developing this, and it seems it might not be possible; due to a combination of "missing" endpoint functionality on Spotify's end, as well as indeterminate scope and/or permission issues.
