@@ -20,11 +20,21 @@ def error_handler(request):
     elif request.status_code==429:
         return "Rate Limit Reached: Check developer dashboard<br>You may need to generate a new API key."
     if request.status_code==204:
-        auth_session = create_auth_session_w_token(session['AUTH_TOKEN'])
-        _, track, progress = fallback(auth_session)
-        return home(track, progress, track['album'], 'playlist')
+        if 'AUTH_TOKEN' in session:
+            auth_session = create_auth_session_w_token(session['AUTH_TOKEN'])
+            _, track, progress = fallback(auth_session)
+            return home(track, progress, track['album'], 'playlist')
+        else:
+            return redirect(url_for('auth'))
     else:
         return True
+
+def request_handled(auth_session, url):
+    try:    
+        r = auth_session.get(url)
+        return r, error_handler(r)
+    except:
+        return None, redirect(url_for('playing'))
 
 @app.route('/')
 def auth():
@@ -44,8 +54,7 @@ def playing():
     '''Calls the API to find the current playing track,
     Uses fallback() if this is not accessable'''
     auth_session = create_auth_session_w_token(session['AUTH_TOKEN'])
-    r = auth_session.get(f"{spotify_endpoint_url}/me/player")
-    error_check = error_handler(r)
+    r, error_check = request_handled(auth_session, f"{spotify_endpoint_url}/me/player")
     if error_check!=True:
         return error_check
     else:
@@ -65,8 +74,7 @@ def playing():
 def playlist():
     '''Same as playing() but fetches playlist information to display'''
     auth_session = create_auth_session_w_token(session['AUTH_TOKEN'])
-    r = auth_session.get(f"{spotify_endpoint_url}/me/player")
-    error_check = error_handler(r)
+    r, error_check = request_handled(auth_session, f"{spotify_endpoint_url}/me/player")
     if error_check!=True:
         return error_check
     else:
@@ -79,8 +87,12 @@ def playlist():
             progress = [response['progress_ms'],response['item']['duration_ms']]
             session['progress'] = progress
             if 'context' in response:
-                if response['context']['type']=='playlist':
-                    _r = auth_session.get(f"{spotify_endpoint_url}/playlists/{response['context']['uri'].split(':')[-1]}")
+                if response['context']==None:
+                    pass
+                elif response['context']['type']=='playlist':
+                    _r, error_check = request_handled(auth_session, f"{spotify_endpoint_url}/playlists/{response['context']['uri'].split(':')[-1]}")
+                    if error_check!=True:
+                        return error_check
                     playlist = _r.json()
                     session['p_id'] = playlist['id']
                     return home(track, progress, playlist, 'playing')
@@ -97,12 +109,16 @@ def fallback(auth_session):
     '''Uses session cache if it exists,
     Otherwise, call the API again to fetch the most recently played track'''
     if 'id' in session:
-        r = auth_session.get(f"{spotify_endpoint_url}/tracks/{session['id']}")
+        r, error_check = request_handled(auth_session, f"{spotify_endpoint_url}/tracks/{session['id']}")
+        if error_check!=True:
+            return error_check
         response = r.json()
         track = response
         progress = session['progress']
     else:
-        r = auth_session.get(f"{spotify_endpoint_url}/me/player/recently-played?limit=1")
+        r, error_check = request_handled(auth_session, f"{spotify_endpoint_url}/me/player/recently-played?limit=1")
+        if error_check!=True:
+            return error_check
         response = r.json()
         track = response['items'][0]['track']
         progress = [0,0]
